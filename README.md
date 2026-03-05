@@ -1,4 +1,4 @@
-# skill-router
+# skills-router-openclaw
 
 Scalable skill routing prototype for OpenClaw environments with 100~400+ skills.
 
