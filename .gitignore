@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime artifacts
+logs/
+*.log
+
+# Data artifacts (regenerable)
+data/skill_inventory.json
+data/skill_registry_v2.json
+data/runs.sqlite3
+reports/pipeline_summary.json
+
+# OS/Editor
+.DS_Store
+.vscode/
+.idea/
