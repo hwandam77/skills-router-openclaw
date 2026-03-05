@@ -6,7 +6,7 @@ Scalable skill routing prototype for OpenClaw environments with 100~400+ skills.
 
 - Builds a local skill registry from installed `SKILL.md` files
 - Applies **Stage A filter** (status/tools/risk/policy)
-- Applies **Stage B ranking** (intent + semantic fallback + quality + policy fit)
+- Applies **Stage B ranking** (intent + **multilingual semantic similarity** + quality + policy fit)
 - Selects Top-K skills for simple/composite tasks
 - Persists run results in SQLite
 - Exposes a lightweight FastAPI interface for planning/execution
@@ -108,14 +108,38 @@ Generates:
 | 400+ 스킬 확장 | 비용/복잡도 증가 | 구조적 대응 가능 |
 | 선택 이유 추적 | 제한적 | 로그/리포트로 추적 가능 |
 
-> Note: current v1 uses deterministic local semantic fallback. Connecting a stronger embedding backend can improve intent matching further.
+> Note: v1.1부터 `paraphrase-multilingual-MiniLM-L12-v2` 기반 시맨틱 백엔드가 기본 적용됩니다. 더 높은 정확도가 필요한 경우 Claude Embeddings API 백엔드로 교체 가능합니다.
+
+## Vector Backend (시맨틱 유사도)
+
+스킬 선택 시 사용자 의도와 스킬 설명 간의 **의미적 유사도**를 계산합니다.
+
+| 백엔드 | 한국어 | 설치 조건 | 활성화 방식 |
+|--------|--------|-----------|-------------|
+| `MultilingualEmbeddingBackend` | ✅ | `sentence-transformers` 설치 시 | 자동 (기본값) |
+| `KeywordVectorBackend` | ❌ | 항상 사용 가능 | `sentence-transformers` 없을 때 폴백 |
+
+**실측 비교** (`"버그 잡아줘"` 입력):
+
+```
+KeywordVectorBackend:     [0.0, 0.0, 0.0]          ← 단어 미매칭 → 전혀 구분 못함
+MultilingualEmbeddingBackend: [-0.07, 0.10, 0.03]  ← 의미적으로 구분
+```
+
+모델: `paraphrase-multilingual-MiniLM-L12-v2` (한/영 동시 지원, 로컬 실행)
+
+```bash
+pip install sentence-transformers
+```
+
+설치 후 재시작하면 자동으로 시맨틱 백엔드가 활성화됩니다.
 
 ## Current status
 
 - Implementation baseline complete (v1 skeleton)
-- Tests passing
+- Multilingual semantic vector backend 적용 완료 (`paraphrase-multilingual-MiniLM-L12-v2`)
+- Tests passing (23/23)
 - Ready for production integration tasks:
-  - real vector backend
   - production registry source
   - service hardening and auth
 
