@@ -12,6 +12,7 @@ from src.router.filter_engine import RouterContext as FilterContext, filter_cand
 from src.router.selector import select_for_task
 from src.router.scoring_engine import rank_skills
 from src.router.vector_adapter import get_default_backend, compute_vector_scores
+from src.router.intent_match import compute_intent_match
 from src.policy.policy_engine import PolicyContext, enforce_policy
 from src.router.types import RouterContext, PlanResponse, ExecuteResponse, RunStatus
 from src.storage.run_store import RunStore
@@ -73,7 +74,7 @@ def router_plan(ctx: RouterContext):
 
     feature_map = {
         s['skill_id']: {
-            'intent_match': 0.8,
+            'intent_match': compute_intent_match(ctx.user_intent, s),
             'vector_similarity': vec.get(s['skill_id'], 0.0),
             'quality_score': s.get('quality_score', 0.5),
             'policy_fit': 1.0,
@@ -83,6 +84,11 @@ def router_plan(ctx: RouterContext):
         for s in allowed
     }
     ranked = rank_skills(allowed, feature_map, has_approval=bool(ctx.approval_token))
+
+    # anti-bias: avoid always selecting same head skill when scores are near-tied
+    if len(ranked) > 1 and abs(ranked[0]['score'] - ranked[1]['score']) < 0.02:
+        ranked[0], ranked[1] = ranked[1], ranked[0]
+
     selected = select_for_task(ranked, ctx.task_type)
 
     status = RunStatus(
