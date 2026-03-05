@@ -11,7 +11,7 @@ from src.registry.enricher import enrich_skills
 from src.router.filter_engine import RouterContext as FilterContext, filter_candidates
 from src.router.selector import select_for_task
 from src.router.scoring_engine import rank_skills
-from src.router.vector_adapter import KeywordVectorBackend, compute_vector_scores
+from src.router.vector_adapter import get_default_backend, compute_vector_scores
 from src.policy.policy_engine import PolicyContext, enforce_policy
 from src.router.types import RouterContext, PlanResponse, ExecuteResponse, RunStatus
 from src.storage.run_store import RunStore
@@ -19,6 +19,7 @@ from src.storage.run_store import RunStore
 app = FastAPI(title='Skill Router v1 API', version='0.2.0')
 store = RunStore(RUN_DB_PATH)
 SKILLS: list[dict] = []
+_vector_backend = None  # initialized at startup
 
 
 def _reload_registry() -> int:
@@ -36,7 +37,9 @@ def _reload_registry() -> int:
 
 @app.on_event('startup')
 def on_startup():
+    global _vector_backend
     _reload_registry()
+    _vector_backend = get_default_backend()
 
 
 @app.get('/router/health')
@@ -66,7 +69,7 @@ def router_plan(ctx: RouterContext):
     rejected = rejected + policy_blocked
 
     docs = {s['skill_id']: f"{s['skill_id']} {' '.join(s.get('intents', []))} {s.get('domain','')}" for s in allowed}
-    vec = compute_vector_scores(ctx.user_intent, docs, backend=KeywordVectorBackend())
+    vec = compute_vector_scores(ctx.user_intent, docs, backend=_vector_backend)
 
     feature_map = {
         s['skill_id']: {

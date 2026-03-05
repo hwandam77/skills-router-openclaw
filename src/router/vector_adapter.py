@@ -32,6 +32,54 @@ class KeywordVectorBackend:
         return scores
 
 
+class MultilingualEmbeddingBackend:
+    """Semantic similarity using paraphrase-multilingual-MiniLM-L12-v2.
+
+    Supports Korean and English out of the box.
+    Falls back to KeywordVectorBackend if sentence-transformers is not installed.
+    Model is loaded once at instantiation and cached for the process lifetime.
+    """
+
+    _model = None  # class-level cache
+
+    def __init__(self, model_name: str = "paraphrase-multilingual-MiniLM-L12-v2"):
+        self.model_name = model_name
+        self._ensure_model()
+
+    def _ensure_model(self) -> None:
+        if MultilingualEmbeddingBackend._model is not None:
+            return
+        try:
+            from sentence_transformers import SentenceTransformer
+            MultilingualEmbeddingBackend._model = SentenceTransformer(self.model_name)
+        except ImportError:
+            MultilingualEmbeddingBackend._model = None
+
+    def similarity(self, query: str, documents: List[str]) -> List[float]:
+        if MultilingualEmbeddingBackend._model is None:
+            return KeywordVectorBackend().similarity(query, documents)
+
+        import numpy as np
+        model = MultilingualEmbeddingBackend._model
+        q_emb = model.encode(query, convert_to_numpy=True)
+        d_embs = model.encode(documents, convert_to_numpy=True)
+
+        # cosine similarity
+        q_norm = q_emb / (np.linalg.norm(q_emb) + 1e-10)
+        d_norms = d_embs / (np.linalg.norm(d_embs, axis=1, keepdims=True) + 1e-10)
+        scores = (d_norms @ q_norm).tolist()
+        return [round(float(s), 6) for s in scores]
+
+
+def get_default_backend() -> VectorBackend:
+    """Return MultilingualEmbeddingBackend if available, else KeywordVectorBackend."""
+    try:
+        import sentence_transformers  # noqa: F401
+        return MultilingualEmbeddingBackend()
+    except ImportError:
+        return KeywordVectorBackend()
+
+
 def compute_vector_scores(
     query: str,
     skill_docs: Dict[str, str],
